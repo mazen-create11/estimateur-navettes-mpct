@@ -414,10 +414,43 @@ select{appearance:none;-webkit-appearance:none;cursor:pointer;
 .row-2{display:flex;gap:12px}
 .row-2 .form-group{flex:1}
 
+/* ---------- Menu déroulant premium (custom select) ---------- */
+.cs{position:relative;width:100%}
+.cs__trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-family:'Public Sans';font-size:.95rem;color:var(--ink);text-align:left;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-xs);padding:11px 13px;transition:.18s}
+.cs__trigger:hover{border-color:#CBD6E2}
+.cs.is-open .cs__trigger{border-color:var(--azure);background:#fff;box-shadow:0 0 0 4px rgba(28,111,184,.12)}
+.cs__value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cs__value.is-placeholder{color:var(--faint)}
+.cs__chev{width:16px;height:16px;color:var(--muted);flex:none;transition:transform .2s}
+.cs.is-open .cs__chev{transform:rotate(180deg);color:var(--azure)}
+.cs__panel{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-lg);padding:6px;opacity:0;visibility:hidden;transform:translateY(-6px);
+  transition:opacity .16s,transform .16s,visibility .16s}
+.cs.is-open .cs__panel{opacity:1;visibility:visible;transform:none}
+.cs__searchbox{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-xs);position:sticky;top:0}
+.cs__searchbox svg{width:15px;height:15px;color:var(--muted);flex:none}
+.cs__search{border:none!important;background:transparent!important;padding:0!important;box-shadow:none!important;
+  font-size:.9rem;color:var(--ink)}
+.cs__search:focus{box-shadow:none!important}
+.cs__list{max-height:264px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#CBD6E2 transparent}
+.cs__list::-webkit-scrollbar{width:8px}
+.cs__list::-webkit-scrollbar-thumb{background:#CBD6E2;border-radius:8px;border:2px solid #fff}
+.cs__opt{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 11px;border-radius:8px;font-size:.92rem;color:var(--ink-2);cursor:pointer;transition:.12s}
+.cs__opt:hover{background:var(--surface-2);color:var(--ink)}
+.cs__opt.is-selected{background:var(--azure-soft);color:var(--azure-deep);font-weight:600}
+.cs__check{width:15px;height:15px;color:var(--azure);flex:none;opacity:0}
+.cs__opt.is-selected .cs__check{opacity:1}
+.cs__empty{padding:16px 11px;text-align:center;color:var(--faint);font-size:.88rem}
+
 #shipsContainer{counter-reset:ship}
 .ship-entry{position:relative;counter-increment:ship;background:var(--surface-2);border:1px solid var(--line-2);
-  border-radius:var(--radius-sm);padding:16px 16px 4px;overflow:hidden}
-.ship-entry::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--azure),var(--azure-deep))}
+  border-radius:var(--radius-sm);padding:16px 16px 4px}
+.ship-entry::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(var(--azure),var(--azure-deep))}
 .ship-entry + .ship-entry{margin-top:14px}
 .ship-entry-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .ship-entry-title{display:inline-flex;align-items:center;gap:9px;font-size:.74rem;font-weight:700;letter-spacing:.1em;
@@ -1350,6 +1383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof SHIPS_DB !== 'undefined' && SHIPS_DB[val]) {
                     const shipData = SHIPS_DB[val];
                     segmentSelect.value = shipData.segment;
+                    segmentSelect.dispatchEvent(new Event('change', { bubbles: true }));
                     if (shipData.capacity > 0) {
                         passengersInput.value = shipData.capacity;
                     } else {
@@ -1375,6 +1409,115 @@ document.addEventListener('DOMContentLoaded', () => {
                 calculateEstimate();
             });
         }
+
+        // Menus déroulants premium (rendu custom + recherche navires)
+        enhanceSelect(shipNameSelect, { search: true, searchPlaceholder: 'Rechercher un navire…' });
+        enhanceSelect(segmentSelect, {});
+    }
+
+    // Transforme un <select> natif en menu déroulant stylé (clair, premium)
+    function enhanceSelect(select, options) {
+        options = options || {};
+        if (!select || select.dataset.enhanced) return;
+        select.dataset.enhanced = '1';
+        select.style.display = 'none';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'cs';
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'cs__trigger';
+        trigger.innerHTML = '<span class="cs__value"></span><svg class="cs__chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>';
+        const valueEl = trigger.querySelector('.cs__value');
+
+        const panel = document.createElement('div');
+        panel.className = 'cs__panel';
+        let searchInput = null;
+        if (options.search) {
+            const box = document.createElement('div');
+            box.className = 'cs__searchbox';
+            box.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>';
+            searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'cs__search';
+            searchInput.placeholder = options.searchPlaceholder || 'Rechercher…';
+            box.appendChild(searchInput);
+            panel.appendChild(box);
+        }
+        const list = document.createElement('div');
+        list.className = 'cs__list';
+        panel.appendChild(list);
+
+        function buildOptions() {
+            list.innerHTML = '';
+            Array.from(select.options).forEach(o => {
+                if (o.value === '') return; // placeholder non listé
+                const it = document.createElement('div');
+                it.className = 'cs__opt' + (o.value === select.value ? ' is-selected' : '');
+                it.dataset.value = o.value;
+                it.innerHTML = '<span>' + o.textContent + '</span><svg class="cs__check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8.5 6.5 12 13 4.5"/></svg>';
+                it.addEventListener('click', () => choose(o.value));
+                list.appendChild(it);
+            });
+        }
+        function syncLabel() {
+            const sel = select.options[select.selectedIndex];
+            valueEl.textContent = sel ? sel.textContent : '';
+            valueEl.classList.toggle('is-placeholder', !select.value);
+            list.querySelectorAll('.cs__opt').forEach(it => it.classList.toggle('is-selected', it.dataset.value === select.value));
+        }
+        function choose(v) {
+            select.value = v;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            syncLabel();
+            close();
+        }
+        function filter(q) {
+            q = (q || '').toLowerCase().trim();
+            let any = false;
+            list.querySelectorAll('.cs__opt').forEach(it => {
+                const m = it.textContent.toLowerCase().includes(q);
+                it.style.display = m ? '' : 'none';
+                if (m) any = true;
+            });
+            let empty = list.querySelector('.cs__empty');
+            if (!any) {
+                if (!empty) { empty = document.createElement('div'); empty.className = 'cs__empty'; empty.textContent = 'Aucun résultat'; list.appendChild(empty); }
+                empty.style.display = '';
+            } else if (empty) { empty.style.display = 'none'; }
+        }
+        function open() {
+            buildOptions(); syncLabel();
+            wrap.classList.add('is-open');
+            if (searchInput) { searchInput.value = ''; filter(''); setTimeout(() => searchInput.focus(), 10); }
+            const sel = list.querySelector('.cs__opt.is-selected');
+            if (sel) sel.scrollIntoView({ block: 'nearest' });
+            document.addEventListener('mousedown', outside, true);
+            document.addEventListener('keydown', onKey, true);
+        }
+        function close() {
+            wrap.classList.remove('is-open');
+            document.removeEventListener('mousedown', outside, true);
+            document.removeEventListener('keydown', onKey, true);
+        }
+        function outside(e) { if (!wrap.contains(e.target)) close(); }
+        function onKey(e) { if (e.key === 'Escape') close(); }
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            wrap.classList.contains('is-open') ? close() : open();
+        });
+        if (searchInput) {
+            searchInput.addEventListener('input', () => filter(searchInput.value));
+            searchInput.addEventListener('click', e => e.stopPropagation());
+        }
+        select.addEventListener('change', syncLabel);
+
+        select.parentNode.insertBefore(wrap, select.nextSibling);
+        wrap.appendChild(trigger);
+        wrap.appendChild(panel);
+        buildOptions();
+        syncLabel();
     }
 
     function updateRemoveButtons() {
